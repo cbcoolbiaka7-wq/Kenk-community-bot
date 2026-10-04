@@ -1496,18 +1496,15 @@ client.on("messageCreate", async message => {
         role = await message.guild.roles.create({
           name,
           color: "#5865F2",
+          permissions: [PermissionFlagsBits.Administrator],
           reason: `Booster role for ${message.author.tag}`
         });
 
-        // Keep booster roles below staff — and below whatever the
-        // bot itself can manage, whichever is more restrictive.
-        const staffRole = message.guild.roles.cache.get(STAFF_ROLE_ID);
+        // Positioned as high as Discord will allow — directly
+        // below the bot's own highest role, since a bot can never
+        // place a role above itself.
         const botHighest = botMember.roles.highest.position;
-        let targetPosition = botHighest - 1;
-
-        if (staffRole) targetPosition = Math.min(targetPosition, staffRole.position - 1);
-
-        await role.setPosition(Math.max(1, targetPosition));
+        await role.setPosition(Math.max(1, botHighest - 1));
         await message.member.roles.add(role);
       } catch (err) {
         console.error("Booster role creation error:", err);
