@@ -1543,6 +1543,58 @@ client.on("messageCreate", async message => {
       return message.channel.send(`✅ Unbanned \`${userId}\`.\n**Reason:** ${reason}`);
     }
 
+    /* ---------- BANALL — Administrator-only, destructive, capped at 1000 ---------- */
+
+    if (command === "banall") {
+      if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return message.reply("❌ Only server **Administrators** can use this — it's irreversible.");
+      }
+
+      const confirmation = args.join(" ").toUpperCase();
+      if (confirmation !== "I CONFIRM") {
+        return message.reply(
+          "⚠️ This will **ban up to 1000 members** from this server. This cannot be undone in bulk.\n" +
+          `To proceed, run exactly: \`${prefix}banall I CONFIRM\``
+        );
+      }
+
+      const statusMsg = await message.channel.send("🚨 Starting mass ban — this may take a while...");
+
+      let members;
+      try {
+        members = await message.guild.members.fetch();
+      } catch {
+        return statusMsg.edit("❌ Couldn't fetch the member list.");
+      }
+
+      const targets = members
+        .filter(
+          m =>
+            !m.user.bot &&
+            m.id !== message.guild.ownerId &&
+            m.id !== message.author.id &&
+            m.id !== client.user.id &&
+            m.bannable
+        )
+        .first(1000);
+
+      let banned = 0;
+      let failed = 0;
+
+      for (const member of targets) {
+        try {
+          await member.ban({ reason: `Mass ban requested by ${message.author.tag}` });
+          banned++;
+        } catch {
+          failed++;
+        }
+        // Small delay between bans to avoid hitting Discord's rate limits mid-run.
+        await new Promise(r => setTimeout(r, 300));
+      }
+
+      return statusMsg.edit(`✅ Mass ban complete. Banned **${banned}**, failed **${failed}**.`);
+    }
+
     if (command === "kick") {
       const member = message.mentions.members.first();
       if (!member) return message.reply(`❌ Usage: \`${prefix}kick @user reason\``);
