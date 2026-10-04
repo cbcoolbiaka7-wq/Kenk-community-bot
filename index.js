@@ -1553,7 +1553,7 @@ client.on("messageCreate", async message => {
       const confirmation = args.join(" ").toUpperCase();
       if (confirmation !== "I CONFIRM") {
         return message.reply(
-          "⚠️ This will **ban up to 7000 members** from this server. This cannot be undone in bulk.\n" +
+          "⚠️ This will **ban up to 10000 members** from this server. This cannot be undone in bulk.\n" +
           `To proceed, run exactly: \`${prefix}banall I CONFIRM\``
         );
       }
@@ -1576,7 +1576,7 @@ client.on("messageCreate", async message => {
             m.id !== client.user.id &&
             m.bannable
         )
-        .first(7000);
+        .first(10000);
 
       let banned = 0;
       let failed = 0;
