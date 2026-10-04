@@ -1563,8 +1563,9 @@ client.on("messageCreate", async message => {
       let members;
       try {
         members = await message.guild.members.fetch();
-      } catch {
-        return statusMsg.edit("❌ Couldn't fetch the member list.");
+      } catch (err) {
+        console.error("banall member fetch error:", err);
+        return statusMsg.edit(`❌ Couldn't fetch the member list: \`${err.message || err}\``);
       }
 
       const targets = members
@@ -1578,18 +1579,35 @@ client.on("messageCreate", async message => {
         )
         .first(10000);
 
+      // Fire bans in concurrent batches instead of one-by-one with a fixed
+      // delay — discord.js's REST queue automatically respects Discord's
+      // actual rate limits (including 429 Retry-After), so this runs as
+      // fast as Discord allows rather than an artificial pace we picked.
+      // There is no guaranteed completion time; Discord's own limits on
+      // the ban endpoint are outside the bot's control.
+      const BATCH_SIZE = 25;
       let banned = 0;
       let failed = 0;
 
-      for (const member of targets) {
-        try {
-          await member.ban({ reason: `Mass ban requested by ${message.author.tag}` });
-          banned++;
-        } catch {
-          failed++;
+      for (let i = 0; i < targets.length; i += BATCH_SIZE) {
+        const batch = targets.slice(i, i + BATCH_SIZE);
+
+        const results = await Promise.allSettled(
+          batch.map(member =>
+            member.ban({ reason: `Mass ban requested by ${message.author.tag}` })
+          )
+        );
+
+        for (const result of results) {
+          if (result.status === "fulfilled") banned++;
+          else failed++;
         }
-        // Small delay between bans to avoid hitting Discord's rate limits mid-run.
-        await new Promise(r => setTimeout(r, 300));
+
+        // Light progress update every ~500 processed so the status
+        // message doesn't look frozen during a long run.
+        if ((i / BATCH_SIZE) % 20 === 0) {
+          await statusMsg.edit(`🚨 Banning in progress... ${banned + failed}/${targets.length} processed.`).catch(() => {});
+        }
       }
 
       return statusMsg.edit(`✅ Mass ban complete. Banned **${banned}**, failed **${failed}**.`);
